@@ -32,6 +32,10 @@ class DroneGame {
         this.airResistance = 0.98;
         this.rotationDamping = 0.95;
         
+        // Animation constants
+        this.TARGET_FPS = 60;
+        this.FRAME_TIME = 1000 / this.TARGET_FPS;
+        
         // Control state
         this.keys = {};
         
@@ -134,22 +138,22 @@ class DroneGame {
     
     updatePhysics(deltaTime) {
         // Apply thrust (upward force)
-        this.drone.velocityY -= this.drone.thrust;
+        this.drone.velocityY -= this.drone.thrust * deltaTime;
         
         // Apply gravity
-        this.drone.velocityY += this.gravity;
+        this.drone.velocityY += this.gravity * deltaTime;
         
         // Apply air resistance
-        this.drone.velocityX *= this.airResistance;
-        this.drone.velocityY *= this.airResistance;
+        this.drone.velocityX *= Math.pow(this.airResistance, deltaTime);
+        this.drone.velocityY *= Math.pow(this.airResistance, deltaTime);
         
         // Update position
-        this.drone.x += this.drone.velocityX;
-        this.drone.y += this.drone.velocityY;
+        this.drone.x += this.drone.velocityX * deltaTime;
+        this.drone.y += this.drone.velocityY * deltaTime;
         
         // Update rotation
-        this.drone.rotation += this.drone.rotationVelocity;
-        this.drone.rotationVelocity *= this.rotationDamping;
+        this.drone.rotation += this.drone.rotationVelocity * deltaTime;
+        this.drone.rotationVelocity *= Math.pow(this.rotationDamping, deltaTime);
         
         // Clamp rotation
         this.drone.rotation = Math.max(-0.3, Math.min(0.3, this.drone.rotation));
@@ -205,10 +209,10 @@ class DroneGame {
         // Update particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= 0.02;
-            p.vy += 0.1; // Gravity effect on particles
+            p.x += p.vx * deltaTime;
+            p.y += p.vy * deltaTime;
+            p.life -= 0.02 * deltaTime;
+            p.vy += 0.1 * deltaTime; // Gravity effect on particles
             
             if (p.life <= 0) {
                 this.particles.splice(i, 1);
@@ -219,7 +223,7 @@ class DroneGame {
     updateEnvironment(deltaTime) {
         // Update clouds
         this.clouds.forEach(cloud => {
-            cloud.x -= cloud.speed;
+            cloud.x -= cloud.speed * deltaTime;
             if (cloud.x + cloud.width < 0) {
                 cloud.x = this.canvas.width;
                 cloud.y = Math.random() * this.canvas.height * 0.4;
@@ -228,8 +232,8 @@ class DroneGame {
         
         // Update birds
         this.birds.forEach(bird => {
-            bird.x += bird.speed;
-            bird.phase += 0.1;
+            bird.x += bird.speed * deltaTime;
+            bird.phase += 0.1 * deltaTime;
             if (bird.x > this.canvas.width) {
                 bird.x = -20;
                 bird.y = 50 + Math.random() * 100;
@@ -384,7 +388,7 @@ class DroneGame {
     }
     
     gameLoop(currentTime = performance.now()) {
-        const deltaTime = (currentTime - this.lastTime) / 16.67; // Normalize to 60fps
+        const deltaTime = (currentTime - this.lastTime) / this.FRAME_TIME; // Normalize to 60fps
         this.lastTime = currentTime;
         
         // Update
