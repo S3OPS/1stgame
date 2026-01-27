@@ -4,12 +4,26 @@
  */
 
 const SPAWN_EDGES = 3;
-const STAR_COUNT = 80;
+const STAR_COUNT = 150;
 const LASER_FIRE_COOLDOWN_MS = 120;
 const GROUND_LEVEL_OFFSET = 60;
 const LASER_COLLISION_RADIUS = 6;
 const MIN_SPAWN_COOLDOWN = 60;
 const SPAWN_COOLDOWN_REDUCTION = 8;
+const STAR_RESET_BOUNDARY = 5;
+const STAR_SPAWN_OFFSET = -10;
+const STAR_MOVEMENT_SPEED = 0.03;
+const TWINKLE_BASE = 0.6;
+const TWINKLE_AMPLITUDE = 0.4;
+const ATMOSPHERIC_LINE_SPACING = 26;
+const GROUND_DECORATION_START = 40;
+const GROUND_DECORATION_SPACING = 140;
+const GROUND_DECORATION_WIDTH = 18;
+const GROUND_DECORATION_HEIGHT = 6;
+const PARTICLE_MIN_SIZE = 2;
+const PARTICLE_SIZE_VARIANCE = 2;
+const EXPLOSION_PARTICLE_MIN_SIZE = 3;
+const EXPLOSION_PARTICLE_SIZE_VARIANCE = 4;
 
 class LaserDefenseGame {
     constructor() {
@@ -28,11 +42,18 @@ class LaserDefenseGame {
         this.lasers = [];
         this.drones = [];
         this.particles = [];
-        this.stars = Array.from({ length: STAR_COUNT }, () => ({
-            x: Math.random() * this.canvas.width,
-            y: Math.random() * this.canvas.height,
-            radius: 0.8 + Math.random() * 1.2
-        }));
+        this.stars = Array.from({ length: STAR_COUNT }, () => {
+            const layer = 0.5 + Math.random() * 0.8;
+            return {
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                radius: (0.6 + Math.random() * 1.6) * layer,
+                alpha: 0.3 + Math.random() * 0.7,
+                twinkle: Math.random() * Math.PI * 2,
+                twinkleSpeed: 0.0006 + Math.random() * 0.0016,
+                layer
+            };
+        });
 
         this.score = 0;
         this.integrity = 100;
@@ -45,6 +66,7 @@ class LaserDefenseGame {
 
         this.keys = {};
         this.lastTime = performance.now();
+        this.frameTime = this.lastTime;
 
         this.setupEventListeners();
         this.spawnWave();
@@ -234,7 +256,9 @@ class LaserDefenseGame {
                 vx: (Math.random() - 0.5) * 3,
                 vy: (Math.random() - 0.5) * 3,
                 life: 20,
-                color
+                maxLife: 20,
+                color,
+                size: PARTICLE_MIN_SIZE + Math.random() * PARTICLE_SIZE_VARIANCE
             });
         }
     }
@@ -247,7 +271,9 @@ class LaserDefenseGame {
                 vx: (Math.random() - 0.5) * 5,
                 vy: (Math.random() - 0.5) * 5,
                 life: 35,
-                color: 'rgba(255,180,80,0.9)'
+                maxLife: 35,
+                color: 'rgba(255,180,80,0.95)',
+                size: EXPLOSION_PARTICLE_MIN_SIZE + Math.random() * EXPLOSION_PARTICLE_SIZE_VARIANCE
             });
         }
     }
@@ -289,6 +315,7 @@ class LaserDefenseGame {
     }
 
     drawBackground() {
+        const time = this.frameTime;
         const gradient = this.ctx.createRadialGradient(
             this.canvas.width / 2,
             this.canvas.height * 0.2,
@@ -297,81 +324,193 @@ class LaserDefenseGame {
             this.canvas.height,
             this.canvas.width
         );
-        gradient.addColorStop(0, '#1b2a48');
-        gradient.addColorStop(1, '#05070f');
+        gradient.addColorStop(0, '#20325c');
+        gradient.addColorStop(0.55, '#0b152c');
+        gradient.addColorStop(1, '#04060d');
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        const nebula = this.ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
+        nebula.addColorStop(0, 'rgba(90,130,255,0.18)');
+        nebula.addColorStop(0.45, 'rgba(20,40,90,0)');
+        nebula.addColorStop(1, 'rgba(255,120,220,0.12)');
+        this.ctx.fillStyle = nebula;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.fillStyle = 'rgba(120, 200, 255, 0.08)';
+        for (let y = 0; y < this.canvas.height; y += ATMOSPHERIC_LINE_SPACING) {
+            this.ctx.fillRect(0, y, this.canvas.width, 1);
+        }
+        this.ctx.restore();
+
         this.stars.forEach((star) => {
+            star.y += STAR_MOVEMENT_SPEED * star.layer;
+            if (star.y > this.canvas.height + STAR_RESET_BOUNDARY) {
+                star.y = STAR_SPAWN_OFFSET;
+                star.x = Math.random() * this.canvas.width;
+            }
+            const twinkle = TWINKLE_BASE + TWINKLE_AMPLITUDE * Math.sin(time * star.twinkleSpeed + star.twinkle);
+            this.ctx.fillStyle = `rgba(220,235,255,${star.alpha * twinkle})`;
             this.ctx.beginPath();
             this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
             this.ctx.fill();
         });
 
-        this.ctx.fillStyle = '#1a2a1f';
-        this.ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 50);
+        const horizonGlow = this.ctx.createRadialGradient(
+            this.canvas.width / 2,
+            this.canvas.height - 80,
+            20,
+            this.canvas.width / 2,
+            this.canvas.height - 60,
+            this.canvas.width * 0.6
+        );
+        horizonGlow.addColorStop(0, 'rgba(120,200,255,0.25)');
+        horizonGlow.addColorStop(1, 'rgba(10,20,35,0)');
+        this.ctx.fillStyle = horizonGlow;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        const groundGradient = this.ctx.createLinearGradient(0, this.canvas.height - 90, 0, this.canvas.height);
+        groundGradient.addColorStop(0, '#0b1a1e');
+        groundGradient.addColorStop(1, '#040609');
+        this.ctx.fillStyle = groundGradient;
+        this.ctx.fillRect(0, this.canvas.height - 60, this.canvas.width, 60);
+
+        this.ctx.fillStyle = 'rgba(120,200,255,0.2)';
+        for (let x = GROUND_DECORATION_START; x < this.canvas.width; x += GROUND_DECORATION_SPACING) {
+            this.ctx.fillRect(x, this.canvas.height - 55, GROUND_DECORATION_WIDTH, GROUND_DECORATION_HEIGHT);
+        }
     }
 
     drawLasers() {
-        this.ctx.strokeStyle = '#ff3344';
-        this.ctx.lineWidth = 3;
+        this.ctx.save();
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        this.ctx.strokeStyle = 'rgba(255,80,120,0.45)';
+        this.ctx.lineWidth = 8;
+        this.ctx.shadowColor = 'rgba(255,80,120,0.6)';
+        this.ctx.shadowBlur = 18;
+        this.lasers.forEach((laser) => {
+            this.ctx.beginPath();
+            this.ctx.moveTo(laser.originX, laser.originY);
+            this.ctx.lineTo(laser.x, laser.y);
+            this.ctx.stroke();
+
+            this.ctx.fillStyle = 'rgba(255,200,220,0.7)';
+            this.ctx.beginPath();
+            this.ctx.arc(laser.x, laser.y, 4, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        this.ctx.shadowBlur = 0;
+        this.ctx.strokeStyle = '#fff4f7';
+        this.ctx.lineWidth = 2;
         this.lasers.forEach((laser) => {
             this.ctx.beginPath();
             this.ctx.moveTo(laser.originX, laser.originY);
             this.ctx.lineTo(laser.x, laser.y);
             this.ctx.stroke();
         });
+        this.ctx.restore();
     }
 
     drawDrones() {
         this.drones.forEach((drone) => {
+            const time = this.frameTime * 0.002;
+            const tilt = Math.sin(time + drone.wobble) * 0.18;
             this.ctx.save();
             this.ctx.translate(drone.x, drone.y);
-            this.ctx.fillStyle = drone.color;
+            this.ctx.rotate(tilt);
+            const bodyGradient = this.ctx.createRadialGradient(
+                -drone.radius * 0.3,
+                -drone.radius * 0.2,
+                drone.radius * 0.2,
+                0,
+                0,
+                drone.radius
+            );
+            bodyGradient.addColorStop(0, '#f2fbff');
+            bodyGradient.addColorStop(0.4, drone.color);
+            bodyGradient.addColorStop(1, 'rgba(20,40,60,0.95)');
+            this.ctx.fillStyle = bodyGradient;
+            this.ctx.shadowColor = 'rgba(120,200,255,0.35)';
+            this.ctx.shadowBlur = 12;
             this.ctx.beginPath();
             this.ctx.ellipse(0, 0, drone.radius, drone.radius * 0.7, 0, 0, Math.PI * 2);
             this.ctx.fill();
+            this.ctx.shadowBlur = 0;
 
-            this.ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = 'rgba(120,200,255,0.45)';
+            this.ctx.lineWidth = 3;
             this.ctx.beginPath();
             this.ctx.moveTo(-drone.radius * 0.6, 0);
             this.ctx.lineTo(drone.radius * 0.6, 0);
             this.ctx.stroke();
 
-            this.ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            this.ctx.fillStyle = 'rgba(200,240,255,0.9)';
             this.ctx.beginPath();
-            this.ctx.arc(-drone.radius * 0.3, -drone.radius * 0.2, 3, 0, Math.PI * 2);
+            this.ctx.ellipse(0, -drone.radius * 0.2, drone.radius * 0.35, drone.radius * 0.22, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            const thrusterGradient = this.ctx.createRadialGradient(
+                0,
+                drone.radius * 0.35,
+                2,
+                0,
+                drone.radius * 0.45,
+                drone.radius * 0.6
+            );
+            thrusterGradient.addColorStop(0, 'rgba(130,220,255,0.9)');
+            thrusterGradient.addColorStop(1, 'rgba(20,60,120,0)');
+            this.ctx.fillStyle = thrusterGradient;
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, drone.radius * 0.4, drone.radius * 0.5, drone.radius * 0.3, 0, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.restore();
         });
     }
 
     drawParticles() {
+        this.ctx.save();
+        this.ctx.globalCompositeOperation = 'lighter';
         this.particles.forEach((particle) => {
+            const lifeRatio = Math.max(0, particle.life / particle.maxLife);
             this.ctx.fillStyle = particle.color;
-            this.ctx.globalAlpha = Math.max(0, particle.life / 35);
+            this.ctx.globalAlpha = lifeRatio;
             this.ctx.beginPath();
-            this.ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+            this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.globalAlpha = 1;
+
+            this.ctx.globalAlpha = lifeRatio * 0.4;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, particle.size * 2.2, 0, Math.PI * 2);
+            this.ctx.fill();
         });
+        this.ctx.globalAlpha = 1;
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.restore();
     }
 
     drawCrosshair() {
         const { x, y, radius } = this.crosshair;
-        this.ctx.strokeStyle = '#ffd166';
+        this.ctx.save();
+        this.ctx.strokeStyle = '#bfe6ff';
         this.ctx.lineWidth = 2;
+        this.ctx.shadowColor = 'rgba(140,200,255,0.6)';
+        this.ctx.shadowBlur = 12;
         this.ctx.beginPath();
         this.ctx.arc(x, y, radius, 0, Math.PI * 2);
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
+        this.ctx.strokeStyle = '#ffd166';
+        this.ctx.lineWidth = 1;
         this.ctx.beginPath();
         this.ctx.moveTo(x - radius - 6, y);
         this.ctx.lineTo(x + radius + 6, y);
         this.ctx.moveTo(x, y - radius - 6);
         this.ctx.lineTo(x, y + radius + 6);
         this.ctx.stroke();
+        this.ctx.restore();
     }
 
     drawGameOver() {
@@ -394,6 +533,7 @@ class LaserDefenseGame {
     gameLoop(currentTime = performance.now()) {
         const delta = currentTime - this.lastTime;
         this.lastTime = currentTime;
+        this.frameTime = currentTime;
 
         if (!this.gameOver) {
             this.fireLasers();
