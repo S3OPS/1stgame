@@ -71,10 +71,7 @@ That's it! The game will automatically launch in your browser at `http://localho
 
 No build process required! Just edit the files and refresh your browser.
 
-For development with auto-reload:
-```bash
-npm run dev
-```
+For development with auto-reload, use your preferred static server tooling.
 
 ## 🎨 Customization
 
@@ -110,4 +107,4 @@ Created by a Senior Animation Programmer with 15 years of experience in game dev
 
 ---
 
-**Enjoy flying your drone! 🚁✨**
+**Hold the line and defend the base! ✨**
