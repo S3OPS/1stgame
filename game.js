@@ -3,6 +3,9 @@
  * Rebuilt gameplay focused on defending against AI drones with corner lasers.
  */
 
+const SPAWN_EDGES = 3;
+const STAR_COUNT = 80;
+
 class LaserDefenseGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -20,12 +23,18 @@ class LaserDefenseGame {
         this.lasers = [];
         this.drones = [];
         this.particles = [];
+        this.stars = Array.from({ length: STAR_COUNT }, () => ({
+            x: Math.random() * this.canvas.width,
+            y: Math.random() * this.canvas.height,
+            radius: 0.8 + Math.random() * 1.2
+        }));
 
         this.score = 0;
         this.integrity = 100;
         this.wave = 1;
         this.spawnTimer = 0;
         this.spawnCooldown = 120;
+        this.lastLaserTime = 0;
         this.isFiring = false;
         this.gameOver = false;
 
@@ -85,7 +94,7 @@ class LaserDefenseGame {
     }
 
     createDrone() {
-        const edge = Math.floor(Math.random() * 3);
+        const edge = Math.floor(Math.random() * SPAWN_EDGES);
         const spawnPadding = 40;
         let x = 0;
         let y = 0;
@@ -288,11 +297,11 @@ class LaserDefenseGame {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        for (let i = 0; i < 80; i++) {
+        this.stars.forEach((star) => {
             this.ctx.beginPath();
-            this.ctx.arc(Math.random() * this.canvas.width, Math.random() * this.canvas.height, 1.5, 0, Math.PI * 2);
+            this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
             this.ctx.fill();
-        }
+        });
 
         this.ctx.fillStyle = '#1a2a1f';
         this.ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 50);

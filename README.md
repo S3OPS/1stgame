@@ -64,7 +64,8 @@ That's it! The game will automatically launch in your browser at `http://localho
 ├── index.html      # Main HTML file with game container
 ├── game.js         # Game engine and defense logic
 ├── package.json    # NPM configuration
-└── README.md       # This file
+├── README.md       # This file
+└── laser-defense.png # Screenshot of the updated game
 ```
 
 ## 🧪 Development
