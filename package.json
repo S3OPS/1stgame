@@ -1,16 +1,23 @@
 {
-  "name": "drone-flying-game",
-  "version": "1.0.0",
-  "description": "A one-page drone flying animation game - run with one command!",
+  "name": "laser-defense-game",
+  "version": "2.0.0",
+  "description": "Laser Defense: AI Drone Assault - A modular HTML5 canvas defense game",
   "main": "index.html",
+  "type": "module",
   "scripts": {
-    "start": "npx serve -s . -l 3000"
+    "start": "npx serve -s . -l 3000",
+    "start:modular": "npx serve -s src -l 3001",
+    "lint": "npx eslint src/**/*.js --no-error-on-unmatched-pattern || true",
+    "test": "echo 'No tests configured yet' && exit 0"
   },
   "keywords": [
     "game",
     "drone",
-    "animation",
-    "html5"
+    "laser",
+    "defense",
+    "canvas",
+    "html5",
+    "modular"
   ],
   "author": "Senior Animation Programmer",
   "license": "MIT"
