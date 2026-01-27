@@ -52,6 +52,12 @@ export const EXPLOSION_PARTICLE_COUNT = 18;
 export const HIT_PARTICLE_LIFE = 20;
 export const EXPLOSION_PARTICLE_LIFE = 35;
 
+// Drone Appearance
+export const DRONE_HUE_BASE = 180;
+export const DRONE_HUE_VARIANCE = 40;
+export const DRONE_SATURATION = 70;
+export const DRONE_LIGHTNESS = 60;
+
 // Scoring
 export const DRONE_DESTROY_SCORE = 50;
 export const GROUND_HIT_DAMAGE = 4;

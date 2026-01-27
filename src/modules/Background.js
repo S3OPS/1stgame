@@ -117,7 +117,8 @@ export function drawBackground(ctx, canvasWidth, canvasHeight, stars, time) {
 }
 
 /**
- * Draw twinkling stars
+ * Draw twinkling stars (private helper)
+ * @private
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {Array} stars - Star array
  * @param {number} time - Current time
@@ -133,7 +134,8 @@ function drawStars(ctx, stars, time) {
 }
 
 /**
- * Draw the ground area
+ * Draw the ground area (private helper)
+ * @private
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {number} canvasWidth - Canvas width
  * @param {number} canvasHeight - Canvas height

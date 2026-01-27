@@ -11,7 +11,11 @@ import {
     DRONE_BASE_SPEED,
     DRONE_SPEED_VARIANCE,
     DRONE_BASE_HEALTH,
-    GROUND_LEVEL_OFFSET
+    GROUND_LEVEL_OFFSET,
+    DRONE_HUE_BASE,
+    DRONE_HUE_VARIANCE,
+    DRONE_SATURATION,
+    DRONE_LIGHTNESS
 } from './constants.js';
 
 /**
@@ -57,7 +61,7 @@ export function initializeDrone(drone, canvasWidth, canvasHeight, wave) {
     drone.radius = DRONE_MIN_RADIUS + Math.random() * DRONE_RADIUS_VARIANCE;
     drone.speed = DRONE_BASE_SPEED + Math.random() * DRONE_SPEED_VARIANCE + wave * 0.05;
     drone.wobble = Math.random() * Math.PI * 2;
-    drone.color = `hsl(${180 + Math.random() * 40}, 70%, 60%)`;
+    drone.color = `hsl(${DRONE_HUE_BASE + Math.random() * DRONE_HUE_VARIANCE}, ${DRONE_SATURATION}%, ${DRONE_LIGHTNESS}%)`;
     drone.health = DRONE_BASE_HEALTH + Math.floor(wave / 2);
     drone.drift = (Math.random() - 0.5) * 0.6;
     drone.active = true;

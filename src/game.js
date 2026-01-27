@@ -11,6 +11,8 @@
  * - HUD.js: UI management
  * - GameState.js: State management
  * - ObjectPool.js: Memory optimization
+ * - ScreenEffects.js: Screen shake and announcements
+ * - DebugOverlay.js: Performance monitoring
  * - constants.js: Configuration
  */
 
@@ -23,6 +25,8 @@ import { createDroneTemplate, initializeDrone, updateDrone, hasReachedGround, dr
 import { createLaserTemplate, initializeLaser, updateLaser, isLaserExpired, checkLaserDroneCollision, drawLasers } from './modules/Laser.js';
 import { createParticleTemplate, initializeHitParticle, initializeExplosionParticle, updateParticle, isParticleExpired, getHitParticleCount, getExplosionParticleCount, drawParticles } from './modules/Particle.js';
 import { updateHUD, drawCrosshair, drawGameOver } from './modules/HUD.js';
+import { ScreenEffects } from './modules/ScreenEffects.js';
+import { DebugOverlay } from './modules/DebugOverlay.js';
 
 /**
  * Main Game Class - Orchestrates all modules
@@ -39,6 +43,9 @@ class LaserDefenseGame {
         // Initialize core systems
         this.state = new GameState();
         this.input = new InputManager(this.canvas);
+        this.screenEffects = new ScreenEffects();
+        this.debugOverlay = new DebugOverlay();
+        this.isPaused = false;
         
         // Object pools for memory optimization
         this.dronePool = new ObjectPool(createDroneTemplate, 30);
@@ -58,8 +65,25 @@ class LaserDefenseGame {
         this.input.init();
         this.input.onRestart(() => this.resetGame());
         
+        // Additional key bindings
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === 'p') this.togglePause();
+            if (key === 'd') this.debugOverlay.toggle();
+        });
+        
         this.spawnWave();
+        this.screenEffects.announceWave(1);
         this.gameLoop();
+    }
+    
+    /**
+     * Toggle pause state
+     */
+    togglePause() {
+        if (!this.state.gameOver) {
+            this.isPaused = !this.isPaused;
+        }
     }
     
     /**
@@ -70,7 +94,9 @@ class LaserDefenseGame {
         this.laserPool.releaseAll();
         this.particlePool.releaseAll();
         this.state.reset();
+        this.isPaused = false;
         this.spawnWave();
+        this.screenEffects.announceWave(1);
     }
     
     /**
@@ -136,6 +162,7 @@ class LaserDefenseGame {
             if (hasReachedGround(drone, this.canvas.height)) {
                 this.state.applyGroundDamage();
                 this.spawnExplosion(drone.x, this.canvas.height - GROUND_LEVEL_OFFSET);
+                this.screenEffects.shake(12); // Screen shake on ground impact
                 return true; // Release back to pool
             }
             return false;
@@ -215,6 +242,7 @@ class LaserDefenseGame {
         // Check for wave completion
         if (this.dronePool.getActiveCount() === 0) {
             this.state.advanceWave();
+            this.screenEffects.announceWave(this.state.wave);
             this.spawnWave();
         }
         
@@ -236,9 +264,10 @@ class LaserDefenseGame {
      */
     gameLoop(currentTime = performance.now()) {
         this.state.updateTiming(currentTime);
+        this.debugOverlay.updateFPS(currentTime);
         
-        // Update phase
-        if (!this.state.gameOver) {
+        // Update phase (skip if paused, except effects)
+        if (!this.state.gameOver && !this.isPaused) {
             this.fireLasers();
             this.updateLasers();
             this.updateDrones();
@@ -248,10 +277,22 @@ class LaserDefenseGame {
             this.updateBackground();
         }
         
+        // Always update screen effects
+        this.screenEffects.update();
+        
+        // Update debug stats
+        this.debugOverlay.setStat('Drones', this.dronePool.getActiveCount());
+        this.debugOverlay.setStat('Lasers', this.laserPool.getActiveCount());
+        this.debugOverlay.setStat('Particles', this.particlePool.getActiveCount());
+        this.debugOverlay.setStat('Wave', this.state.wave);
+        
         // Update HUD
         updateHUD(this.state.getHUDState(this.dronePool.getActiveCount()));
         
-        // Render phase
+        // Render phase with screen shake
+        this.ctx.save();
+        this.screenEffects.applyTransform(this.ctx);
+        
         drawBackground(this.ctx, this.canvas.width, this.canvas.height, this.stars, this.state.frameTime);
         drawLasers(this.ctx, this.laserPool.getActive());
         
@@ -264,11 +305,42 @@ class LaserDefenseGame {
         const crosshair = this.input.getCrosshair();
         drawCrosshair(this.ctx, crosshair.x, crosshair.y);
         
+        this.ctx.restore();
+        
+        // Draw overlays (after restore to avoid shake)
+        this.screenEffects.drawAnnouncements(this.ctx, this.canvas.width, this.canvas.height);
+        
         if (this.state.gameOver) {
             drawGameOver(this.ctx, this.canvas.width, this.canvas.height);
         }
         
+        // Draw pause screen
+        if (this.isPaused) {
+            this.drawPauseScreen();
+        }
+        
+        // Draw debug overlay
+        this.debugOverlay.draw(this.ctx);
+        
         requestAnimationFrame((time) => this.gameLoop(time));
+    }
+    
+    /**
+     * Draw pause screen overlay
+     */
+    drawPauseScreen() {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2);
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '20px Arial';
+        this.ctx.fillText('Press P to resume', this.canvas.width / 2, this.canvas.height / 2 + 40);
+        this.ctx.textAlign = 'start';
     }
 }
 
