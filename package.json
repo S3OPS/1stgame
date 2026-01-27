@@ -1,0 +1,17 @@
+{
+  "name": "drone-flying-game",
+  "version": "1.0.0",
+  "description": "A one-page drone flying animation game - run with one command!",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -s . -l 3000"
+  },
+  "keywords": [
+    "game",
+    "drone",
+    "animation",
+    "html5"
+  ],
+  "author": "Senior Animation Programmer",
+  "license": "MIT"
+}
