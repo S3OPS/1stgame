@@ -12,11 +12,18 @@ const MIN_SPAWN_COOLDOWN = 60;
 const SPAWN_COOLDOWN_REDUCTION = 8;
 const STAR_RESET_BOUNDARY = 5;
 const STAR_SPAWN_OFFSET = -10;
+const STAR_MOVEMENT_SPEED = 0.03;
+const TWINKLE_BASE = 0.6;
+const TWINKLE_AMPLITUDE = 0.4;
 const ATMOSPHERIC_LINE_SPACING = 26;
 const GROUND_DECORATION_START = 40;
 const GROUND_DECORATION_SPACING = 140;
 const GROUND_DECORATION_WIDTH = 18;
 const GROUND_DECORATION_HEIGHT = 6;
+const PARTICLE_MIN_SIZE = 2;
+const PARTICLE_SIZE_VARIANCE = 2;
+const EXPLOSION_PARTICLE_MIN_SIZE = 3;
+const EXPLOSION_PARTICLE_SIZE_VARIANCE = 4;
 
 class LaserDefenseGame {
     constructor() {
@@ -251,7 +258,7 @@ class LaserDefenseGame {
                 life: 20,
                 maxLife: 20,
                 color,
-                size: 2 + Math.random() * 2
+                size: PARTICLE_MIN_SIZE + Math.random() * PARTICLE_SIZE_VARIANCE
             });
         }
     }
@@ -266,7 +273,7 @@ class LaserDefenseGame {
                 life: 35,
                 maxLife: 35,
                 color: 'rgba(255,180,80,0.95)',
-                size: 3 + Math.random() * 4
+                size: EXPLOSION_PARTICLE_MIN_SIZE + Math.random() * EXPLOSION_PARTICLE_SIZE_VARIANCE
             });
         }
     }
@@ -339,12 +346,12 @@ class LaserDefenseGame {
         this.ctx.restore();
 
         this.stars.forEach((star) => {
-            star.y += 0.03 * star.layer;
+            star.y += STAR_MOVEMENT_SPEED * star.layer;
             if (star.y > this.canvas.height + STAR_RESET_BOUNDARY) {
                 star.y = STAR_SPAWN_OFFSET;
                 star.x = Math.random() * this.canvas.width;
             }
-            const twinkle = 0.6 + 0.4 * Math.sin(time * star.twinkleSpeed + star.twinkle);
+            const twinkle = TWINKLE_BASE + TWINKLE_AMPLITUDE * Math.sin(time * star.twinkleSpeed + star.twinkle);
             this.ctx.fillStyle = `rgba(220,235,255,${star.alpha * twinkle})`;
             this.ctx.beginPath();
             this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
