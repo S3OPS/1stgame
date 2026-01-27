@@ -192,8 +192,9 @@ class LaserDefenseGame {
             drone.x += drone.drift;
 
             if (drone.y > this.canvas.height - GROUND_LEVEL_OFFSET) {
-                this.integrity = Math.max(0, this.integrity - 0.2);
-                drone.y = this.canvas.height - GROUND_LEVEL_OFFSET;
+                this.integrity = Math.max(0, this.integrity - 4);
+                this.spawnExplosion(drone.x, this.canvas.height - GROUND_LEVEL_OFFSET);
+                this.drones.splice(i, 1);
             }
         }
 
