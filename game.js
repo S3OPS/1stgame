@@ -10,6 +10,11 @@ const GROUND_LEVEL_OFFSET = 60;
 const LASER_COLLISION_RADIUS = 6;
 const MIN_SPAWN_COOLDOWN = 60;
 const SPAWN_COOLDOWN_REDUCTION = 8;
+const ATMOSPHERIC_LINE_SPACING = 26;
+const GROUND_DECORATION_START = 40;
+const GROUND_DECORATION_SPACING = 140;
+const GROUND_DECORATION_WIDTH = 18;
+const GROUND_DECORATION_HEIGHT = 6;
 
 class LaserDefenseGame {
     constructor() {
@@ -241,6 +246,7 @@ class LaserDefenseGame {
                 vx: (Math.random() - 0.5) * 3,
                 vy: (Math.random() - 0.5) * 3,
                 life: 20,
+                maxLife: 20,
                 color,
                 size: 2 + Math.random() * 2
             });
@@ -255,6 +261,7 @@ class LaserDefenseGame {
                 vx: (Math.random() - 0.5) * 5,
                 vy: (Math.random() - 0.5) * 5,
                 life: 35,
+                maxLife: 35,
                 color: 'rgba(255,180,80,0.95)',
                 size: 3 + Math.random() * 4
             });
@@ -323,7 +330,7 @@ class LaserDefenseGame {
         this.ctx.save();
         this.ctx.globalAlpha = 0.5;
         this.ctx.fillStyle = 'rgba(120, 200, 255, 0.08)';
-        for (let y = 0; y < this.canvas.height; y += 26) {
+        for (let y = 0; y < this.canvas.height; y += ATMOSPHERIC_LINE_SPACING) {
             this.ctx.fillRect(0, y, this.canvas.width, 1);
         }
         this.ctx.restore();
@@ -361,8 +368,8 @@ class LaserDefenseGame {
         this.ctx.fillRect(0, this.canvas.height - 60, this.canvas.width, 60);
 
         this.ctx.fillStyle = 'rgba(120,200,255,0.2)';
-        for (let x = 40; x < this.canvas.width; x += 140) {
-            this.ctx.fillRect(x, this.canvas.height - 55, 18, 6);
+        for (let x = GROUND_DECORATION_START; x < this.canvas.width; x += GROUND_DECORATION_SPACING) {
+            this.ctx.fillRect(x, this.canvas.height - 55, GROUND_DECORATION_WIDTH, GROUND_DECORATION_HEIGHT);
         }
     }
 
@@ -457,7 +464,8 @@ class LaserDefenseGame {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'lighter';
         this.particles.forEach((particle) => {
-            const lifeRatio = Math.max(0, particle.life / 35);
+            const maxLife = particle.maxLife ?? 35;
+            const lifeRatio = Math.max(0, particle.life / maxLife);
             this.ctx.fillStyle = particle.color;
             this.ctx.globalAlpha = lifeRatio;
             this.ctx.beginPath();
