@@ -59,6 +59,7 @@ class LaserDefenseGame {
 
         this.keys = {};
         this.lastTime = performance.now();
+        this.frameTime = this.lastTime;
 
         this.setupEventListeners();
         this.spawnWave();
