@@ -10,6 +10,9 @@ const GROUND_LEVEL_OFFSET = 60;
 const LASER_COLLISION_RADIUS = 6;
 const MIN_SPAWN_COOLDOWN = 60;
 const SPAWN_COOLDOWN_REDUCTION = 8;
+const DEFAULT_PARTICLE_LIFE = 35;
+const STAR_RESET_BOUNDARY = 5;
+const STAR_SPAWN_OFFSET = -10;
 const ATMOSPHERIC_LINE_SPACING = 26;
 const GROUND_DECORATION_START = 40;
 const GROUND_DECORATION_SPACING = 140;
@@ -337,8 +340,8 @@ class LaserDefenseGame {
 
         this.stars.forEach((star) => {
             star.y += 0.03 * star.layer;
-            if (star.y > this.canvas.height + 5) {
-                star.y = -10;
+            if (star.y > this.canvas.height + STAR_RESET_BOUNDARY) {
+                star.y = STAR_SPAWN_OFFSET;
                 star.x = Math.random() * this.canvas.width;
             }
             const twinkle = 0.6 + 0.4 * Math.sin(time * star.twinkleSpeed + star.twinkle);
@@ -464,7 +467,7 @@ class LaserDefenseGame {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'lighter';
         this.particles.forEach((particle) => {
-            const maxLife = particle.maxLife ?? 35;
+            const maxLife = particle.maxLife ?? DEFAULT_PARTICLE_LIFE;
             const lifeRatio = Math.max(0, particle.life / maxLife);
             this.ctx.fillStyle = particle.color;
             this.ctx.globalAlpha = lifeRatio;
