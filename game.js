@@ -5,6 +5,11 @@
 
 const SPAWN_EDGES = 3;
 const STAR_COUNT = 80;
+const LASER_FIRE_COOLDOWN_MS = 120;
+const GROUND_LEVEL_OFFSET = 60;
+const LASER_COLLISION_RADIUS = 6;
+const MIN_SPAWN_COOLDOWN = 60;
+const SPAWN_COOLDOWN_REDUCTION = 8;
 
 class LaserDefenseGame {
     constructor() {
@@ -132,7 +137,7 @@ class LaserDefenseGame {
             this.lastLaserTime = now;
         }
 
-        if (now - this.lastLaserTime < 120) {
+        if (now - this.lastLaserTime < LASER_FIRE_COOLDOWN_MS) {
             return;
         }
 
@@ -186,9 +191,9 @@ class LaserDefenseGame {
             drone.y += Math.sin(angle + wobbleOffset) * drone.speed;
             drone.x += drone.drift;
 
-            if (drone.y > this.canvas.height - 60) {
+            if (drone.y > this.canvas.height - GROUND_LEVEL_OFFSET) {
                 this.integrity = Math.max(0, this.integrity - 0.2);
-                drone.y = this.canvas.height - 60;
+                drone.y = this.canvas.height - GROUND_LEVEL_OFFSET;
             }
         }
 
@@ -205,7 +210,7 @@ class LaserDefenseGame {
                 const dx = drone.x - laser.x;
                 const dy = drone.y - laser.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < drone.radius + 6) {
+                if (dist < drone.radius + LASER_COLLISION_RADIUS) {
                     this.lasers.splice(j, 1);
                     drone.health -= 1;
                     this.spawnHitParticles(drone.x, drone.y, drone.color);
@@ -263,7 +268,7 @@ class LaserDefenseGame {
     updateWave() {
         if (this.drones.length === 0 && !this.gameOver) {
             this.wave += 1;
-            this.spawnCooldown = Math.max(60, this.spawnCooldown - 8);
+            this.spawnCooldown = Math.max(MIN_SPAWN_COOLDOWN, this.spawnCooldown - SPAWN_COOLDOWN_REDUCTION);
             this.spawnWave();
         }
 
