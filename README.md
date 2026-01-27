@@ -1,6 +1,6 @@
-# 🚁 Drone Flying Animation Game
+# 🚁 Laser Defense: AI Drone Assault
 
-A sophisticated HTML5 canvas-based drone flying simulator with realistic physics and smooth animations. Built with 15 years of animation programming expertise.
+A rebuilt HTML5 canvas defense game where AI-controlled drones attack and you stop them with twin corner lasers.
 
 ## 🎮 One Command to Rule Them All
 
@@ -23,25 +23,20 @@ That's it! The game will automatically launch in your browser at `http://localho
    npm start
    ```
 
-3. **Play!** Your browser will open automatically. Use the controls below to fly your drone.
+3. **Play!** Your browser will open automatically. Use the controls below to defend the base.
 
 ## 🎯 Features
 
-- **Realistic Physics Engine**: Gravity, thrust, air resistance, and momentum
-- **Smooth Animations**: 60 FPS with delta-time based updates
-- **Particle System**: Dynamic propeller exhaust effects
-- **Environmental Elements**: Animated clouds and birds
-- **Camera System**: Smooth camera tracking
-- **HUD Display**: Real-time altitude, speed, and battery monitoring
-- **Responsive Controls**: Keyboard-based flight controls
+- **AI Drone Waves**: Drones seek your crosshair with evasive wobble
+- **Corner Lasers**: Dual laser beams fire from the bottom corners
+- **Particle Effects**: Impact sparks and explosions
+- **HUD Display**: Score, base integrity, wave, and drone count
 
 ## 🕹️ Controls
 
-- **W / ↑** - Increase thrust (fly up)
-- **S / ↓** - Decrease thrust
-- **A / ←** - Move left
-- **D / →** - Move right
-- **R** - Reset drone position
+- **Mouse Move** - Aim the crosshair
+- **Mouse Click/Hold** - Fire corner lasers
+- **R** - Restart defense
 
 ## 🛠️ Technical Details
 
@@ -58,37 +53,34 @@ That's it! The game will automatically launch in your browser at `http://localho
 - Rotation interpolation and damping
 
 ### Physics Simulation
-- Newtonian physics with gravity and thrust
-- Air resistance simulation
-- Collision detection with boundaries
-- Energy conservation (battery system)
+- AI steering behavior with wobble offsets
+- Collision detection for lasers vs drones
+- Wave-based spawning and difficulty scaling
 
 ## 📁 Project Structure
 
 ```
 1stgame/
 ├── index.html      # Main HTML file with game container
-├── game.js         # Game engine and animation logic
+├── game.js         # Game engine and defense logic
 ├── package.json    # NPM configuration
-└── README.md       # This file
+├── README.md       # This file
+└── laser-defense.png # Screenshot of the updated game
 ```
 
 ## 🧪 Development
 
 No build process required! Just edit the files and refresh your browser.
 
-For development with auto-reload:
-```bash
-npm run dev
-```
+For development with auto-reload, use your preferred static server tooling.
 
 ## 🎨 Customization
 
 The game is designed to be easily customizable:
 
-- **Drone appearance**: Edit `drawDrone()` method in `game.js`
-- **Physics**: Adjust constants in the constructor (gravity, air resistance, etc.)
-- **Environment**: Modify `initEnvironment()` to add more clouds, birds, or obstacles
+- **Drone appearance**: Edit `drawDrones()` in `game.js`
+- **Weapons**: Adjust the laser cadence in `fireLasers()`
+- **Difficulty**: Tune wave sizes and spawn cooldowns in `spawnWave()` and `updateWave()`
 - **Colors**: Update CSS in `index.html` or canvas drawing calls
 
 ## 📊 Performance
@@ -101,11 +93,9 @@ The game is designed to be easily customizable:
 ## 🌟 Future Enhancements
 
 Potential additions:
-- Collectible items and scoring system
-- Obstacles and challenges
-- Multiple drone types
+- Multiple drone types and formations
+- Defensive upgrades and power-ups
 - Sound effects and music
-- Multiplayer support
 - Mobile touch controls
 
 ## 📄 License
@@ -118,4 +108,4 @@ Created by a Senior Animation Programmer with 15 years of experience in game dev
 
 ---
 
-**Enjoy flying your drone! 🚁✨**
+**Hold the line and defend the base! ✨**

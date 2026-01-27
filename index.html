@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drone Flying Game - One Command Edition</title>
+    <title>Laser Defense: AI Drone Assault</title>
     <style>
         * {
             margin: 0;
@@ -24,8 +24,8 @@
         #gameCanvas {
             border: 4px solid #333;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 70%, #90EE90 100%);
-            cursor: crosshair;
+            background: radial-gradient(circle at top, #152238 0%, #0a0f1f 60%, #03060f 100%);
+            cursor: none;
         }
         
         #hud {
@@ -71,18 +71,17 @@
 </head>
 <body>
     <div id="hud">
-        <div class="hud-item">Altitude: <span id="altitude">0</span>m</div>
-        <div class="hud-item">Speed: <span id="speed">0</span> m/s</div>
-        <div class="hud-item">Battery: <span id="battery">100</span>%</div>
+        <div class="hud-item">Score: <span id="score">0</span></div>
+        <div class="hud-item">Base Integrity: <span id="integrity">100</span>%</div>
+        <div class="hud-item">Wave: <span id="wave">1</span></div>
+        <div class="hud-item">Active Drones: <span id="drones">0</span></div>
     </div>
     
     <div id="instructions">
         <h3>🎮 Controls</h3>
-        <p>⬆️ W/↑ - Increase Thrust</p>
-        <p>⬇️ S/↓ - Decrease Thrust</p>
-        <p>⬅️ A/← - Move Left</p>
-        <p>➡️ D/→ - Move Right</p>
-        <p>🔄 R - Reset Position</p>
+        <p>🖱️ Move Mouse - Aim Crosshair</p>
+        <p>💥 Click/Hold - Fire Corner Lasers</p>
+        <p>🔄 R - Restart Defense</p>
     </div>
     
     <canvas id="gameCanvas"></canvas>
