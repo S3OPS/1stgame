@@ -25,7 +25,7 @@ export function createPowerUpTemplate() {
         type: PowerUpType.SHIELD,
         active: false,
         lifeTime: 0,
-        maxLifeTime: 600, // 10 seconds at 60fps
+        maxLifeTime: 900, // 15 seconds at 60fps (matches spawn interval)
         velocity: { x: 0, y: 0.5 },
         rotation: 0,
         collected: false
@@ -44,7 +44,7 @@ export function initializePowerUp(powerUp, canvasWidth, canvasHeight) {
     powerUp.type = selectRandomPowerUpType();
     powerUp.active = true;
     powerUp.lifeTime = 0;
-    powerUp.maxLifeTime = 600;
+    powerUp.maxLifeTime = 900; // 15 seconds at 60fps
     powerUp.velocity = { x: (Math.random() - 0.5) * 0.3, y: 0.5 + Math.random() * 0.3 };
     powerUp.rotation = 0;
     powerUp.collected = false;

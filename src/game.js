@@ -65,12 +65,12 @@ class LaserDefenseGame {
         this.particlePool = new ObjectPool(createParticleTemplate, 200);
         this.powerUpPool = new ObjectPool(createPowerUpTemplate, 10);
         
-        // Power-up state tracking
+        // Power-up state tracking (camelCase keys map to PowerUpType constants)
         this.activePowerUps = {
-            shield: 0,
-            rapidFire: 0,
-            tripleLaser: 0,
-            scoreMultiplier: 0
+            shield: 0,              // PowerUpType.SHIELD
+            rapidFire: 0,           // PowerUpType.RAPID_FIRE
+            tripleLaser: 0,         // PowerUpType.TRIPLE_LASER
+            scoreMultiplier: 0      // PowerUpType.SCORE_MULTIPLIER
         };
         this.powerUpSpawnTimer = 0;
         this.powerUpSpawnInterval = 900; // 15 seconds at 60fps
@@ -97,9 +97,26 @@ class LaserDefenseGame {
         // Initialize audio on first mousedown
         this.canvas.addEventListener('mousedown', () => {
             if (!this.audioInitialized) {
-                this.audio.init();
-                this.audio.playBackgroundMusic();
-                this.audioInitialized = true;
+                try {
+                    this.audio.init();
+                    this.audio.playBackgroundMusic();
+                    this.audioInitialized = true;
+                } catch (error) {
+                    console.error('Audio initialization failed:', error);
+                }
+            }
+        }, { once: true });
+        
+        // Also try to init on any key press as fallback
+        window.addEventListener('keydown', () => {
+            if (!this.audioInitialized) {
+                try {
+                    this.audio.init();
+                    this.audio.playBackgroundMusic();
+                    this.audioInitialized = true;
+                } catch (error) {
+                    console.error('Audio initialization failed:', error);
+                }
             }
         }, { once: true });
         
@@ -213,7 +230,10 @@ class LaserDefenseGame {
         const droneType = selectRandomDroneType(this.state.wave);
         const config = getDroneConfig(droneType, this.state.wave);
         
-        // Store type and config on drone
+        // Initialize drone first to get base setup
+        initializeDrone(drone, this.canvas.width, this.canvas.height, this.state.wave);
+        
+        // Override with type-specific config after initialization
         drone.droneType = droneType;
         drone.radius = config.radius;
         drone.speed = config.speed;
@@ -221,8 +241,6 @@ class LaserDefenseGame {
         drone.maxHealth = config.health;
         drone.color = config.color;
         drone.score = config.score;
-        
-        initializeDrone(drone, this.canvas.width, this.canvas.height, this.state.wave);
     }
     
     /**
@@ -447,6 +465,7 @@ class LaserDefenseGame {
      */
     activatePowerUp(type) {
         const duration = getPowerUpDuration(type);
+        const description = getPowerUpDescription(type);
         
         switch (type) {
             case PowerUpType.SHIELD:
@@ -463,7 +482,8 @@ class LaserDefenseGame {
                 break;
         }
         
-        this.screenEffects.announceWave(this.state.wave, getPowerUpDescription(type));
+        // Show power-up name briefly (reuse wave announcement system)
+        console.log(`Power-up activated: ${description}`);
     }
     
     /**

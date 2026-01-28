@@ -230,9 +230,14 @@ export class AudioManager {
      */
     stopBackgroundMusic() {
         if (this.musicSource && this.isMusicPlaying) {
-            this.musicSource.osc1.stop();
-            this.musicSource.osc2.stop();
-            this.musicSource.lfo.stop();
+            try {
+                this.musicSource.osc1.stop();
+                this.musicSource.osc2.stop();
+                this.musicSource.lfo.stop();
+            } catch (error) {
+                // Oscillators may already be stopped
+                console.warn('Could not stop music oscillators:', error);
+            }
             this.musicSource = null;
             this.isMusicPlaying = false;
         }
