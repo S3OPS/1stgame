@@ -19,6 +19,15 @@ export function updateHUD(state) {
     if (integrityEl) integrityEl.textContent = Math.round(state.integrity);
     if (waveEl) waveEl.textContent = state.wave;
     if (dronesEl) dronesEl.textContent = state.droneCount;
+    
+    // Update difficulty indicator if present
+    if (state.difficulty) {
+        const difficultyEl = document.getElementById('difficulty');
+        if (difficultyEl) {
+            difficultyEl.textContent = state.difficulty;
+            difficultyEl.style.color = state.difficultyColor || '#60a5fa';
+        }
+    }
 }
 
 /**

@@ -35,6 +35,16 @@ import { AudioManager } from './modules/AudioManager.js';
 import { selectRandomDroneType, getDroneConfig, drawDroneByType } from './modules/DroneTypes.js';
 import { createPowerUpTemplate, initializePowerUp, updatePowerUp, checkPowerUpCollision, drawPowerUp, getPowerUpDuration, getPowerUpDescription, PowerUpType } from './modules/PowerUp.js';
 import { isHighScore, addHighScore, drawHighScoreTable, drawInitialsPrompt } from './modules/HighScore.js';
+import { ComboSystem } from './modules/ComboSystem.js';
+import { DifficultyManager, Difficulty } from './modules/DifficultyManager.js';
+import { 
+    initializeSmokeParticle, updateSmokeParticle, drawSmokeParticle,
+    initializeDebrisParticle, updateDebrisParticle, drawDebrisParticle,
+    createShockwave, updateShockwave, drawShockwave,
+    createLaserCharge, updateLaserCharge, drawLaserCharge,
+    createScreenFlash, updateScreenFlash, drawScreenFlash,
+    shouldEmitSmoke, createEnhancedExplosion
+} from './modules/EnhancedEffects.js';
 
 /**
  * Main Game Class - Orchestrates all modules
@@ -54,7 +64,13 @@ class LaserDefenseGame {
         this.screenEffects = new ScreenEffects();
         this.debugOverlay = new DebugOverlay();
         this.audio = new AudioManager();
+        this.comboSystem = new ComboSystem();
+        this.difficultyManager = new DifficultyManager();
         this.isPaused = false;
+        
+        // Game state modes
+        this.showingDifficultySelector = true;
+        this.selectedDifficulty = Difficulty.NORMAL;
         
         // Audio initialization flag
         this.audioInitialized = false;
@@ -64,6 +80,20 @@ class LaserDefenseGame {
         this.laserPool = new ObjectPool(createLaserTemplate, 100);
         this.particlePool = new ObjectPool(createParticleTemplate, 200);
         this.powerUpPool = new ObjectPool(createPowerUpTemplate, 10);
+        
+        // Enhanced effects pools
+        this.smokePool = new ObjectPool(() => ({ 
+            x: 0, y: 0, vx: 0, vy: 0, size: 0, life: 0, maxLife: 0, 
+            alpha: 0, color: '', type: 'smoke', active: false 
+        }), 100);
+        this.debrisPool = new ObjectPool(() => ({ 
+            x: 0, y: 0, vx: 0, vy: 0, size: 0, life: 0, maxLife: 0, 
+            alpha: 0, color: '', rotation: 0, rotationSpeed: 0, gravity: 0,
+            type: 'debris', active: false 
+        }), 150);
+        this.shockwaves = [];
+        this.laserCharges = [];
+        this.screenFlashes = [];
         
         // Power-up state tracking (camelCase keys map to PowerUpType constants)
         this.activePowerUps = {
@@ -81,6 +111,9 @@ class LaserDefenseGame {
         this.viewingScores = false;
         this.playerHighScorePosition = null;
         
+        // Wave bonus tracking
+        this.waveBonusAnnouncements = [];
+        
         // Star field (static array, not pooled)
         this.stars = createStarField(this.canvas.width, this.canvas.height);
         
@@ -93,6 +126,11 @@ class LaserDefenseGame {
         // Setup input and start game
         this.input.init();
         this.input.onRestart(() => this.resetGame());
+        
+        // Don't spawn wave yet - wait for difficulty selection
+        // this.spawnWave();
+        // this.screenEffects.announceWave(1);
+        this.gameLoop();
         
         // Initialize audio on first mousedown
         this.canvas.addEventListener('mousedown', () => {
@@ -136,6 +174,26 @@ class LaserDefenseGame {
     handleKeyDown(e) {
         const key = e.key.toLowerCase();
         
+        // Difficulty selection
+        if (this.showingDifficultySelector) {
+            if (key === 'arrowup') {
+                const difficulties = [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD];
+                const currentIndex = difficulties.indexOf(this.selectedDifficulty);
+                if (currentIndex > 0) {
+                    this.selectedDifficulty = difficulties[currentIndex - 1];
+                }
+            } else if (key === 'arrowdown') {
+                const difficulties = [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD];
+                const currentIndex = difficulties.indexOf(this.selectedDifficulty);
+                if (currentIndex < difficulties.length - 1) {
+                    this.selectedDifficulty = difficulties[currentIndex + 1];
+                }
+            } else if (key === 'enter') {
+                this.startGameWithDifficulty(this.selectedDifficulty);
+            }
+            return;
+        }
+        
         // High score initials entry
         if (this.enteringInitials) {
             if (key === 'enter' && this.currentInitials.length === 3) {
@@ -175,6 +233,27 @@ class LaserDefenseGame {
                 this.playerHighScorePosition = null;
             }
         }
+        if (key === 'n' && this.state.gameOver) {
+            this.showingDifficultySelector = true;
+            this.selectedDifficulty = this.difficultyManager.getDifficulty();
+        }
+    }
+    
+    /**
+     * Start game with selected difficulty
+     */
+    startGameWithDifficulty(difficulty) {
+        this.showingDifficultySelector = false;
+        this.difficultyManager.setDifficulty(difficulty);
+        
+        // Apply difficulty to initial state
+        const config = this.difficultyManager.getConfig();
+        this.state.integrity = config.baseIntegrity;
+        this.powerUpSpawnInterval = config.powerUpFrequency * 60; // Convert to frames
+        
+        this.spawnWave();
+        this.screenEffects.announceWave(1);
+        this.audio.playWaveStart();
     }
     
     /**
@@ -194,7 +273,14 @@ class LaserDefenseGame {
         this.laserPool.releaseAll();
         this.particlePool.releaseAll();
         this.powerUpPool.releaseAll();
+        this.smokePool.releaseAll();
+        this.debrisPool.releaseAll();
+        this.shockwaves = [];
+        this.laserCharges = [];
+        this.screenFlashes = [];
+        this.waveBonusAnnouncements = [];
         this.state.reset();
+        this.comboSystem.reset();
         this.isPaused = false;
         this.enteringInitials = false;
         this.currentInitials = '';
@@ -207,16 +293,18 @@ class LaserDefenseGame {
             tripleLaser: 0,
             scoreMultiplier: 0
         };
-        this.spawnWave();
-        this.screenEffects.announceWave(1);
-        this.audio.playWaveStart();
+        
+        // Show difficulty selector
+        this.showingDifficultySelector = true;
+        this.selectedDifficulty = this.difficultyManager.getDifficulty();
     }
     
     /**
      * Spawn a new wave of drones
      */
     spawnWave() {
-        const droneCount = this.state.getDronesForWave();
+        const baseDroneCount = this.state.getDronesForWave();
+        const droneCount = this.difficultyManager.getWaveDroneCount(baseDroneCount);
         for (let i = 0; i < droneCount; i++) {
             this.spawnDrone();
         }
@@ -228,7 +316,10 @@ class LaserDefenseGame {
     spawnDrone() {
         const drone = this.dronePool.acquire();
         const droneType = selectRandomDroneType(this.state.wave);
-        const config = getDroneConfig(droneType, this.state.wave);
+        const baseConfig = getDroneConfig(droneType, this.state.wave);
+        
+        // Apply difficulty modifiers
+        const config = this.difficultyManager.applyToDrone(baseConfig);
         
         // Initialize drone first to get base setup
         initializeDrone(drone, this.canvas.width, this.canvas.height, this.state.wave);
@@ -265,6 +356,11 @@ class LaserDefenseGame {
         
         // Play laser fire sound
         this.audio.playLaserFire();
+        
+        // Create laser charge effects at corners
+        this.laserCorners.forEach(corner => {
+            this.laserCharges.push(createLaserCharge(corner.x, corner.y));
+        });
         
         // Triple laser power-up
         if (this.activePowerUps.tripleLaser > 0) {
@@ -309,12 +405,28 @@ class LaserDefenseGame {
         this.dronePool.processActive((drone) => {
             updateDrone(drone, target.x, target.y, time);
             
+            // Emit smoke from damaged drones
+            if (shouldEmitSmoke(drone)) {
+                const smoke = this.smokePool.acquire();
+                initializeSmokeParticle(smoke, drone.x, drone.y);
+            }
+            
             if (hasReachedGround(drone, this.canvas.height)) {
                 // Shield protects from ground damage
                 if (this.activePowerUps.shield <= 0) {
-                    this.state.applyGroundDamage();
+                    const baseDamage = 10;
+                    const damage = this.difficultyManager.getDamage(baseDamage);
+                    this.state.integrity = Math.max(0, this.state.integrity - damage);
+                    if (this.state.integrity <= 0) {
+                        this.state.gameOver = true;
+                    }
                 }
-                this.spawnExplosion(drone.x, this.canvas.height - GROUND_LEVEL_OFFSET);
+                
+                // Reset combo on ground impact
+                this.comboSystem.resetCombo();
+                
+                // Enhanced ground explosion
+                this.spawnEnhancedExplosion(drone.x, this.canvas.height - GROUND_LEVEL_OFFSET, drone.color, true);
                 this.screenEffects.shake(12);
                 this.audio.playGroundImpact();
                 return true; // Release back to pool
@@ -340,6 +452,9 @@ class LaserDefenseGame {
                     // Release laser
                     this.laserPool.release(laser);
                     
+                    // Register hit with combo system
+                    const comboMultiplier = this.comboSystem.registerHit();
+                    
                     // Damage drone
                     drone.health -= 1;
                     this.spawnHitParticles(drone.x, drone.y, drone.color);
@@ -348,13 +463,15 @@ class LaserDefenseGame {
                     if (drone.health <= 0) {
                         this.dronePool.release(drone);
                         
-                        // Apply score multiplier if active
+                        // Calculate score with all multipliers
                         const baseScore = drone.score || 50;
+                        const difficultyScore = this.difficultyManager.getScore(baseScore);
+                        const comboScore = Math.ceil(difficultyScore * comboMultiplier);
                         const finalScore = this.activePowerUps.scoreMultiplier > 0 ? 
-                            baseScore * 2 : baseScore;
+                            comboScore * 2 : comboScore;
                         this.state.score += finalScore;
                         
-                        this.spawnExplosion(drone.x, drone.y);
+                        this.spawnEnhancedExplosion(drone.x, drone.y, drone.color, false);
                         this.audio.playExplosion();
                     }
                     break;
@@ -386,12 +503,80 @@ class LaserDefenseGame {
     }
     
     /**
+     * Spawn enhanced explosion with multiple effects
+     */
+    spawnEnhancedExplosion(x, y, color, isLarge = false) {
+        // Create standard explosion particles
+        this.spawnExplosion(x, y);
+        
+        // Create enhanced effects
+        const effects = createEnhancedExplosion(x, y, color, isLarge);
+        
+        // Add shockwave
+        this.shockwaves.push(effects.shockwave);
+        
+        // Add debris particles
+        effects.particles.forEach(p => {
+            const debris = this.debrisPool.acquire();
+            Object.assign(debris, p);
+        });
+        
+        // Add screen flash for large explosions
+        if (effects.flash) {
+            this.screenFlashes.push(effects.flash);
+        }
+    }
+    
+    /**
      * Update all particles
      */
     updateParticles() {
         this.particlePool.processActive((particle) => {
             updateParticle(particle);
             return isParticleExpired(particle);
+        });
+    }
+    
+    /**
+     * Update enhanced effects
+     */
+    updateEnhancedEffects() {
+        // Update smoke
+        this.smokePool.processActive((smoke) => {
+            updateSmokeParticle(smoke);
+            return smoke.life >= smoke.maxLife;
+        });
+        
+        // Update debris
+        this.debrisPool.processActive((debris) => {
+            updateDebrisParticle(debris);
+            return debris.life >= debris.maxLife;
+        });
+        
+        // Update shockwaves
+        this.shockwaves = this.shockwaves.filter(shockwave => {
+            updateShockwave(shockwave);
+            return shockwave.active;
+        });
+        
+        // Update laser charges
+        this.laserCharges = this.laserCharges.filter(charge => {
+            updateLaserCharge(charge);
+            return charge.active;
+        });
+        
+        // Update screen flashes
+        this.screenFlashes = this.screenFlashes.filter(flash => {
+            updateScreenFlash(flash);
+            return flash.active;
+        });
+        
+        // Update wave bonus announcements
+        this.waveBonusAnnouncements = this.waveBonusAnnouncements.filter(bonus => {
+            bonus.life++;
+            bonus.y -= 2; // Float upward
+            bonus.alpha = Math.max(0, 1 - bonus.life / bonus.maxLife);
+            return bonus.life < bonus.maxLife;
         });
     }
     
@@ -403,13 +588,32 @@ class LaserDefenseGame {
         
         // Check for wave completion
         if (this.dronePool.getActiveCount() === 0) {
+            // Calculate wave bonus before advancing
+            const baseBonus = 200;
+            const waveMultiplier = this.state.wave * 50;
+            const integrityBonus = Math.floor(this.state.integrity * 10);
+            const totalBonus = baseBonus + waveMultiplier + integrityBonus;
+            
+            // Create wave bonus announcement
+            this.waveBonusAnnouncements.push({
+                baseBonus,
+                waveMultiplier,
+                integrityBonus,
+                totalBonus,
+                x: this.canvas.width / 2,
+                y: this.canvas.height / 2 - 50,
+                life: 0,
+                maxLife: 120,
+                alpha: 1
+            });
+            
             this.state.advanceWave();
             this.screenEffects.announceWave(this.state.wave);
             this.audio.playWaveStart();
             this.spawnWave();
         }
         
-        // Continuous spawning
+        // Continuous spawning with difficulty modifier
         if (this.state.updateSpawnTimer()) {
             this.spawnDrone();
         }
@@ -500,6 +704,19 @@ class LaserDefenseGame {
         this.state.updateTiming(currentTime);
         this.debugOverlay.updateFPS(currentTime);
         
+        // Show difficulty selector
+        if (this.showingDifficultySelector) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            DifficultyManager.drawDifficultySelector(
+                this.ctx, 
+                this.canvas.width, 
+                this.canvas.height, 
+                this.selectedDifficulty
+            );
+            requestAnimationFrame((time) => this.gameLoop(time));
+            return;
+        }
+        
         // Check for high score entry after game over
         if (this.state.gameOver && !this.enteringInitials && !this.viewingScores) {
             if (isHighScore(this.state.score)) {
@@ -514,9 +731,14 @@ class LaserDefenseGame {
             this.updateDrones();
             this.handleCollisions();
             this.updateParticles();
+            this.updateEnhancedEffects();
+            this.comboSystem.update();
             this.updateWave();
             this.updatePowerUps();
             this.updateBackground();
+        } else {
+            // Still update effects even when paused/game over
+            this.updateEnhancedEffects();
         }
         
         // Always update screen effects
@@ -528,18 +750,39 @@ class LaserDefenseGame {
         this.debugOverlay.setStat('Particles', this.particlePool.getActiveCount());
         this.debugOverlay.setStat('PowerUps', this.powerUpPool.getActiveCount());
         this.debugOverlay.setStat('Wave', this.state.wave);
+        this.debugOverlay.setStat('Combo', this.comboSystem.combo);
         
-        // Update HUD
-        updateHUD(this.state.getHUDState(this.dronePool.getActiveCount()));
+        // Update HUD with difficulty
+        const hudState = this.state.getHUDState(this.dronePool.getActiveCount());
+        hudState.difficulty = this.difficultyManager.getConfig().name;
+        hudState.difficultyColor = this.difficultyManager.getConfig().color;
+        updateHUD(hudState);
         
         // Render phase with screen shake
         this.ctx.save();
         this.screenEffects.applyTransform(this.ctx);
         
-        drawBackground(this.ctx, this.canvas.width, this.canvas.height, this.stars, this.state.frameTime);
-        drawLasers(this.ctx, this.laserPool.getActive());
+        // Draw screen flashes first (full screen effect)
+        this.screenFlashes.forEach(flash => {
+            drawScreenFlash(this.ctx, this.canvas.width, this.canvas.height, flash);
+        });
         
-        // Draw drones with type-specific rendering
+        drawBackground(this.ctx, this.canvas.width, this.canvas.height, this.stars, this.state.frameTime);
+        
+        // Draw laser charges at corners
+        this.laserCharges.forEach(charge => drawLaserCharge(this.ctx, charge));
+        
+        // Draw lasers with glow effect
+        this.ctx.save();
+        this.ctx.shadowColor = '#00ffff';
+        this.ctx.shadowBlur = 8;
+        drawLasers(this.ctx, this.laserPool.getActive());
+        this.ctx.restore();
+        
+        // Draw smoke trails (behind drones)
+        this.smokePool.getActive().forEach(smoke => drawSmokeParticle(this.ctx, smoke));
+        
+        // Draw drones with health bars
         const drones = this.dronePool.getActive();
         drones.forEach(drone => {
             if (drone.droneType) {
@@ -547,21 +790,40 @@ class LaserDefenseGame {
             } else {
                 drawDrone(this.ctx, drone, this.state.frameTime);
             }
+            
+            // Draw health bar for damaged drones
+            if (drone.maxHealth && drone.health < drone.maxHealth) {
+                this.drawDroneHealthBar(drone);
+            }
         });
         
         drawParticles(this.ctx, this.particlePool.getActive());
+        
+        // Draw debris particles
+        this.debrisPool.getActive().forEach(debris => drawDebrisParticle(this.ctx, debris));
+        
+        // Draw shockwaves
+        this.shockwaves.forEach(shockwave => drawShockwave(this.ctx, shockwave));
         
         // Draw power-ups
         const powerUps = this.powerUpPool.getActive();
         powerUps.forEach(powerUp => drawPowerUp(this.ctx, powerUp, this.state.frameTime));
         
+        // Draw crosshair with pulsing effect when firing
         const crosshair = this.input.getCrosshair();
-        drawCrosshair(this.ctx, crosshair.x, crosshair.y);
+        const isFiring = this.input.getIsFiring();
+        this.drawEnhancedCrosshair(crosshair.x, crosshair.y, isFiring);
         
         this.ctx.restore();
         
         // Draw overlays (after restore to avoid shake)
         this.screenEffects.drawAnnouncements(this.ctx, this.canvas.width, this.canvas.height);
+        
+        // Draw combo indicator
+        this.comboSystem.draw(this.ctx, this.canvas.width, this.canvas.height);
+        
+        // Draw wave bonus announcements
+        this.drawWaveBonusAnnouncements();
         
         // Draw active power-up indicators
         this.drawPowerUpIndicators();
@@ -584,7 +846,8 @@ class LaserDefenseGame {
                 this.playerHighScorePosition
             );
         } else if (this.state.gameOver) {
-            drawGameOver(this.ctx, this.canvas.width, this.canvas.height);
+            // Draw game over with max combo
+            this.drawGameOverWithCombo();
         }
         
         // Draw pause screen
@@ -672,6 +935,144 @@ class LaserDefenseGame {
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = '20px Arial';
         this.ctx.fillText('Press P to resume', this.canvas.width / 2, this.canvas.height / 2 + 40);
+        this.ctx.textAlign = 'start';
+    }
+    
+    /**
+     * Draw enhanced crosshair with pulsing effect
+     */
+    drawEnhancedCrosshair(x, y, isFiring) {
+        const pulseScale = isFiring ? 1.2 : 1.0;
+        const pulseAlpha = isFiring ? 0.8 : 0.6;
+        
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.scale(pulseScale, pulseScale);
+        
+        // Outer glow
+        if (isFiring) {
+            this.ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+        
+        // Main crosshair
+        this.ctx.strokeStyle = `rgba(0, 255, 255, ${pulseAlpha})`;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        this.ctx.stroke();
+        
+        // Cross lines
+        this.ctx.beginPath();
+        this.ctx.moveTo(-20, 0);
+        this.ctx.lineTo(-5, 0);
+        this.ctx.moveTo(5, 0);
+        this.ctx.lineTo(20, 0);
+        this.ctx.moveTo(0, -20);
+        this.ctx.lineTo(0, -5);
+        this.ctx.moveTo(0, 5);
+        this.ctx.lineTo(0, 20);
+        this.ctx.stroke();
+        
+        this.ctx.restore();
+    }
+    
+    /**
+     * Draw health bar for damaged drone
+     */
+    drawDroneHealthBar(drone) {
+        const barWidth = drone.radius * 2;
+        const barHeight = 4;
+        const barX = drone.x - barWidth / 2;
+        const barY = drone.y - drone.radius - 10;
+        
+        this.ctx.save();
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        // Health
+        const healthPercent = drone.health / drone.maxHealth;
+        const healthColor = healthPercent > 0.5 ? '#4ade80' : healthPercent > 0.25 ? '#fbbf24' : '#ef4444';
+        this.ctx.fillStyle = healthColor;
+        this.ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+        
+        // Border
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(barX, barY, barWidth, barHeight);
+        
+        this.ctx.restore();
+    }
+    
+    /**
+     * Draw wave completion bonus announcements
+     */
+    drawWaveBonusAnnouncements() {
+        this.waveBonusAnnouncements.forEach(bonus => {
+            this.ctx.save();
+            this.ctx.globalAlpha = bonus.alpha;
+            this.ctx.textAlign = 'center';
+            
+            // Title
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 32px Arial';
+            this.ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+            this.ctx.shadowBlur = 10;
+            this.ctx.fillText('WAVE COMPLETE!', bonus.x, bonus.y);
+            
+            // Bonus breakdown
+            this.ctx.shadowBlur = 0;
+            this.ctx.font = '20px Arial';
+            this.ctx.fillStyle = '#fff';
+            this.ctx.fillText(`Base Bonus: ${bonus.baseBonus}`, bonus.x, bonus.y + 35);
+            this.ctx.fillText(`Wave Multiplier: ${bonus.waveMultiplier}`, bonus.x, bonus.y + 60);
+            this.ctx.fillStyle = '#4ade80';
+            this.ctx.fillText(`Integrity Bonus: ${bonus.integrityBonus}`, bonus.x, bonus.y + 85);
+            
+            // Total
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 28px Arial';
+            this.ctx.fillText(`+${bonus.totalBonus} POINTS!`, bonus.x, bonus.y + 115);
+            
+            this.ctx.restore();
+        });
+    }
+    
+    /**
+     * Draw game over screen with max combo
+     */
+    drawGameOverWithCombo() {
+        // Dark overlay
+        this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Game over text
+        this.ctx.fillStyle = '#ff6b6b';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Defense Breached', this.canvas.width / 2, this.canvas.height / 2 - 40);
+        
+        // Max combo display
+        if (this.comboSystem.maxCombo > 1) {
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 24px Arial';
+            this.ctx.fillText(
+                `MAX COMBO: ${this.comboSystem.maxCombo}x`, 
+                this.canvas.width / 2, 
+                this.canvas.height / 2 + 10
+            );
+        }
+        
+        // Restart instructions
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '20px Arial';
+        this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50);
+        this.ctx.fillText('Press N to change difficulty', this.canvas.width / 2, this.canvas.height / 2 + 80);
         this.ctx.textAlign = 'start';
     }
 }

@@ -53,13 +53,23 @@ export class GameState {
     
     /**
      * Advance to next wave
+     * @returns {number} Wave completion bonus score
      */
     advanceWave() {
+        // Calculate wave completion bonus
+        const baseBonus = 200;
+        const waveMultiplier = this.wave * 50;
+        const integrityBonus = Math.floor(this.integrity * 10); // 10 points per % integrity
+        const waveBonus = baseBonus + waveMultiplier + integrityBonus;
+        
+        this.score += waveBonus;
         this.wave += 1;
         this.spawnCooldown = Math.max(
             MIN_SPAWN_COOLDOWN, 
             this.spawnCooldown - SPAWN_COOLDOWN_REDUCTION
         );
+        
+        return waveBonus;
     }
     
     /**
