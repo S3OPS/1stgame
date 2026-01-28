@@ -96,6 +96,7 @@
         <div class="hud-item">Base Integrity: <span id="integrity">100</span>%</div>
         <div class="hud-item">Wave: <span id="wave">1</span></div>
         <div class="hud-item">Active Drones: <span id="drones">0</span></div>
+        <div class="hud-item">Difficulty: <span id="difficulty">Normal</span></div>
     </div>
     
     <div id="instructions">
@@ -103,10 +104,15 @@
         <p>🖱️ Move Mouse - Aim Crosshair</p>
         <p>💥 Click/Hold - Fire Corner Lasers</p>
         <p>🔄 R - Restart Defense</p>
+        <p>🎚️ N - Change Difficulty (Game Over)</p>
+        <p>⏸️ P - Pause Game</p>
+        <p>🔇 M - Toggle Audio</p>
+        <p>🏆 H - View High Scores</p>
+        <p>📊 D - Toggle Debug Info</p>
     </div>
     
     <canvas id="gameCanvas"></canvas>
     
-    <script src="game.js"></script>
+    <script type="module" src="src/game.js"></script>
 </body>
 </html>
